@@ -5,7 +5,7 @@
 
 ### Развертывание инфраструктуры terraform
 
- Развернута инфрастуртура с помощью terraform, 6 серверов.
+ Развернута инфраструктура с помощью terraform, 6 серверов.
 
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_592.png).
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_593.png).
