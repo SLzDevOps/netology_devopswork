@@ -5,7 +5,7 @@
 
 ### Развертвывание инфраструктуры terraform
 
- Развернута инфрастурктура с помощью terraform, 6 серверов.
+ Развернута инфрастуртура с помощью terraform, 6 серверов.
 
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_592.png).
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_593.png).
@@ -75,7 +75,7 @@
 
 
   
-Была проведена тестовая настройка снятия снэпов, что бы не ждать 3.00, потом приведено в соответсиве с условиям работы.
+Была проведена тестовая настройка снятия снэпов, что бы не ждать 3.00, потом приведено в соответствие с условиям работы.
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_633.png).
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_619.png).
 
