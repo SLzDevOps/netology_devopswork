@@ -1,9 +1,9 @@
-# Курсовая работа на профессии "DevOps-инженер с нуля" - `Фомичев Анатолий`
+# Курсовая работа по профессии "DevOps-инженер с нуля" - `Фомичев Анатолий`
 
 ## Ссылка на задачу курсовой работы - https://github.com/netology-code/fops-sysadm-diplom/blob/diplom-zabbix/README.md
 
 
-### Развертвывание инфраструктуры terraform
+### Развертывание инфраструктуры terraform
 
  Развернута инфрастуртура с помощью terraform, 6 серверов.
 
@@ -75,7 +75,7 @@
 
 
   
-Была проведена тестовая настройка снятия снэпов, что бы не ждать 3.00, потом приведено в соответствие с условиям работы.
+Была проведена тестовая настройка снятия снэпов, что бы не ждать 3.00, потом приведено в соответствие с условиями работы.
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_633.png).
 ![alt text](https://github.com/SLzDevOps/netology_devopswork/blob/main/Screenshots/Screenshot_619.png).
 
