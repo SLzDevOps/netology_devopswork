@@ -1,0 +1,150 @@
+---
+- name: Настройка базовых пакетов на всех хостах
+  hosts: all
+  become: yes
+  tasks:
+    - name: Обновление пакетов
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Установка базовых утилит
+      apt:
+        name:
+          - curl
+          - wget
+          - vim
+          - net-tools
+          - htop
+        state: present
+
+- name: Настройка веб-серверов
+  hosts: web_servers
+  become: yes
+  tasks:
+    - name: Установка nginx
+      apt:
+        name: nginx
+        state: present
+    
+    - name: Создание index.html
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Web Server</title>
+          </head>
+          <body>
+              <h1>Web Server: {{ inventory_hostname }}</h1>
+              <p>Private IP: {{ ansible_default_ipv4.address }}</p>
+              <p>Hostname: {{ ansible_hostname }}</p>
+          </body>
+          </html>
+    
+    - name: Запуск nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+- name: Настройка Zabbix
+  hosts: monitoring
+  become: yes
+  tasks:
+    - name: Установка Zabbix Server
+      apt:
+        name: 
+          - zabbix-server-mysql
+          - zabbix-frontend-php
+          - zabbix-apache-conf
+          - zabbix-sql-scripts
+          - zabbix-agent
+        state: present
+    
+    - name: Создание базы данных
+      mysql_db:
+        name: zabbix
+        state: present
+      when: "'mysql-server' in ansible_facts.packages"
+    
+    - name: Запуск сервисов
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - zabbix-server
+        - zabbix-agent
+        - apache2
+
+- name: Настройка Elasticsearch
+  hosts: elasticsearch
+  become: yes
+  tasks:
+    - name: Установка Java
+      apt:
+        name: openjdk-11-jdk
+        state: present
+    
+    - name: Добавление GPG ключа Elasticsearch
+      apt_key:
+        url: "https://artifacts.elastic.co/GPG-KEY-elasticsearch"
+        state: present
+    
+    - name: Добавление репозитория Elasticsearch
+      apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/7.x/apt stable main"
+        state: present
+    
+    - name: Установка Elasticsearch
+      apt:
+        name: elasticsearch
+        state: present
+        update_cache: yes
+    
+    - name: Настройка Elasticsearch
+      lineinfile:
+        path: /etc/elasticsearch/elasticsearch.yml
+        regexp: "^{{ item.key }}"
+        line: "{{ item.key }}: {{ item.value }}"
+      with_items:
+        - { key: "network.host", value: "0.0.0.0" }
+        - { key: "discovery.type", value: "single-node" }
+    
+    - name: Запуск Elasticsearch
+      service:
+        name: elasticsearch
+        state: started
+        enabled: yes
+
+- name: Настройка Kibana
+  hosts: kibana
+  become: yes
+  tasks:
+    - name: Добавление репозитория Kibana
+      apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/7.x/apt stable main"
+        state: present
+    
+    - name: Установка Kibana
+      apt:
+        name: kibana
+        state: present
+        update_cache: yes
+    
+    - name: Настройка Kibana
+      lineinfile:
+        path: /etc/kibana/kibana.yml
+        regexp: "^{{ item.key }}"
+        line: "{{ item.key }}: {{ item.value }}"
+      with_items:
+        - { key: "server.host", value: "0.0.0.0" }
+        - { key: "elasticsearch.hosts", value: "['http://10.130.0.26:9200']" }
+    
+    - name: Запуск Kibana
+      service:
+        name: kibana
+        state: started
+        enabled: yes

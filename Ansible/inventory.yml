@@ -1,0 +1,32 @@
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+  children:
+    bastion:
+      hosts:
+        bastion:
+          ansible_host: 178.154.223.64
+
+    web_servers:
+      hosts:
+        web0:
+          ansible_host: 10.130.2.19
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -i ~/.ssh/id_rsa ubuntu@178.154.223.64"'
+        web1:
+          ansible_host: 10.130.3.31
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -i ~/.ssh/id_rsa ubuntu@178.154.223.64"'
+
+    monitoring:
+      hosts:
+        zabbix:
+          ansible_host: 178.154.221.234
+
+    logging:
+      hosts:
+        elasticsearch:
+          ansible_host: 158.160.127.111
+        kibana:
+          ansible_host: 178.154.223.21

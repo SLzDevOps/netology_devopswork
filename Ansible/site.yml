@@ -1,0 +1,24 @@
+- hosts: bastion
+  become: yes
+  roles:
+    - common
+
+- hosts: web_servers
+  become: yes
+  roles:
+    - webserver
+
+- hosts: zabbix
+  become: yes
+  roles:
+    - monitoring
+
+- hosts: elasticsearch
+  become: yes
+  roles:
+    - logging
+
+- hosts: kibana
+  become: yes
+  roles:
+    - logging

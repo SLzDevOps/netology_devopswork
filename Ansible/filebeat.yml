@@ -1,0 +1,49 @@
+- name: Настройка Filebeat на веб-серверах
+  hosts: web_servers
+  become: yes
+  tasks:
+    - name: Добавление репозитория Elasticsearch
+      apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/7.x/apt stable main"
+        state: present
+    
+    - name: Установка Filebeat
+      apt:
+        name: filebeat
+        state: present
+        update_cache: yes
+    
+    - name: Настройка Filebeat
+      copy:
+        dest: /etc/filebeat/filebeat.yml
+        content: |
+          filebeat.inputs:
+          - type: log
+            enabled: true
+            paths:
+              - /var/log/nginx/access.log
+            fields:
+              type: nginx-access
+          
+          - type: log
+            enabled: true
+            paths:
+              - /var/log/nginx/error.log
+            fields:
+              type: nginx-error
+          
+          output.elasticsearch:
+            hosts: ["10.130.0.22:9200"]
+            indices:
+              - index: "nginx-access-%{+yyyy.MM.dd}"
+                when.equals:
+                  fields.type: "nginx-access"
+              - index: "nginx-error-%{+yyyy.MM.dd}"
+                when.equals:
+                  fields.type: "nginx-error"
+    
+    - name: Запуск Filebeat
+      service:
+        name: filebeat
+        state: started
+        enabled: yes

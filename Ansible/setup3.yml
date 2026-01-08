@@ -1,0 +1,222 @@
+---
+- name: Настройка базовых пакетов на всех хостах
+  hosts: all
+  become: yes
+  tasks:
+    - name: Обновление пакетов
+      apt:
+        update_cache: yes
+        upgrade: dist
+      ignore_errors: yes  # Игнорируем ошибки с репозиториями
+
+    - name: Установка базовых утилит
+      apt:
+        name:
+          - curl
+          - wget
+          - vim
+          - net-tools
+          - htop
+        state: present
+
+- name: Настройка веб-серверов
+  hosts: web_servers
+  become: yes
+  tasks:
+    - name: Установка nginx
+      apt:
+        name: nginx
+        state: present
+    
+    - name: Создание index.html
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Web Server</title>
+          </head>
+          <body>
+              <h1>Web Server: {{ inventory_hostname }}</h1>
+              <p>Private IP: {{ ansible_default_ipv4.address }}</p>
+              <p>Hostname: {{ ansible_hostname }}</p>
+          </body>
+          </html>
+    
+    - name: Запуск nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+- name: Настройка Zabbix
+  hosts: monitoring
+  become: yes
+  tasks:
+    - name: Установка зависимостей
+      apt:
+        name:
+          - postgresql
+          - apache2
+          - php
+          - php-pgsql
+          - libapache2-mod-php
+          - wget
+        state: present
+    
+    - name: Добавление репозитория Zabbix (через команды)
+      shell: |
+        wget -O /tmp/zabbix-release.deb https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu22.04_all.deb
+        dpkg -i /tmp/zabbix-release.deb
+        apt update
+      args:
+        creates: /etc/apt/sources.list.d/zabbix.list
+    
+    - name: Установка Zabbix
+      apt:
+        name:
+          - zabbix-server-pgsql
+          - zabbix-frontend-php
+          - zabbix-agent
+        state: present
+    
+    - name: Настройка PostgreSQL для Zabbix
+      shell: |
+        # Создаем пользователя и базу через sudo
+        sudo -u postgres psql -c "CREATE USER zabbix WITH PASSWORD 'zabbix';" 2>/dev/null || echo "User already exists"
+        sudo -u postgres createdb -O zabbix zabbix 2>/dev/null || echo "Database already exists"
+        
+        # Ищем и импортируем SQL скрипты
+        SQL_FILE=$(find /usr/share -name "*.sql.gz" -type f | grep -i postgresql | head -1)
+        if [ -n "$SQL_FILE" ]; then
+          echo "Importing schema from $SQL_FILE"
+          zcat "$SQL_FILE" | sudo -u zabbix psql zabbix 2>/dev/null || true
+        fi
+      changed_when: false
+    
+    - name: Конфигурация Zabbix Server
+      shell: |
+        sed -i "s/^# DBPassword=.*/DBPassword=zabbix/" /etc/zabbix/zabbix_server.conf
+        sed -i "s/^# DBHost=.*/DBHost=localhost/" /etc/zabbix/zabbix_server.conf
+    
+    - name: Конфигурация Zabbix Agent
+      shell: |
+        sed -i "s/^Server=127.0.0.1$/Server=127.0.0.1/" /etc/zabbix/zabbix_agentd.conf
+        sed -i "s/^ServerActive=127.0.0.1$/ServerActive=127.0.0.1/" /etc/zabbix/zabbix_agentd.conf
+        echo "Hostname=zabbix-server" >> /etc/zabbix/zabbix_agentd.conf
+    
+    - name: Конфигурация PHP
+      shell: |
+        sed -i "s/^;date.timezone =.*/date.timezone = Europe\/Moscow/" /etc/php/8.1/apache2/php.ini
+        sed -i "s/^;max_execution_time =.*/max_execution_time = 300/" /etc/php/8.1/apache2/php.ini
+        sed -i "s/^;memory_limit =.*/memory_limit = 256M/" /etc/php/8.1/apache2/php.ini
+    
+    - name: Настройка Apache для Zabbix
+      shell: |
+        # Создаем конфиг для Zabbix
+        cat > /etc/apache2/sites-available/zabbix.conf << 'EOF'
+        <VirtualHost *:80>
+            DocumentRoot /usr/share/zabbix
+            <Directory /usr/share/zabbix>
+                Options FollowSymLinks
+                AllowOverride None
+                Require all granted
+            </Directory>
+        </VirtualHost>
+        EOF
+        
+        # Отключаем default сайт, включаем Zabbix
+        a2dissite 000-default.conf
+        a2ensite zabbix.conf
+    
+    - name: Запуск сервисов
+      systemd:
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop:
+        - postgresql
+        - zabbix-server
+        - zabbix-agent
+        - apache2
+
+- name: Настройка Elasticsearch через Docker (альтернатива)
+  hosts: elasticsearch
+  become: yes
+  tasks:
+    - name: Установка Docker
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+        state: present
+    
+    - name: Запуск Elasticsearch в Docker
+      shell: |
+        # Останавливаем и удаляем старый контейнер
+        sudo docker stop elasticsearch 2>/dev/null || true
+        sudo docker rm elasticsearch 2>/dev/null || true
+        
+        # Запускаем Elasticsearch 7 в Docker
+        sudo docker run -d \
+          --name elasticsearch \
+          -p 9200:9200 \
+          -p 9300:9300 \
+          -e "discovery.type=single-node" \
+          -e "ES_JAVA_OPTS=-Xms256m -Xmx256m" \
+          -e "xpack.security.enabled=false" \
+          docker.elastic.co/elasticsearch/elasticsearch:7.17.17
+        
+        # Ждем запуска
+        sleep 20
+        curl -s http://localhost:9200/
+      register: docker_result
+      changed_when: false
+
+- name: Настройка Kibana через Docker
+  hosts: kibana
+  become: yes
+  tasks:
+    - name: Установка Docker
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+        state: present
+    
+    - name: Запуск Kibana в Docker
+      shell: |
+        # Останавливаем и удаляем старый контейнер
+        sudo docker stop kibana 2>/dev/null || true
+        sudo docker rm kibana 2>/dev/null || true
+        
+        # Запускаем Kibana в Docker
+        sudo docker run -d \
+          --name kibana \
+          -p 5601:5601 \
+          -e "ELASTICSEARCH_HOSTS=http://10.130.0.26:9200" \
+          docker.elastic.co/kibana/kibana:7.17.17
+        
+        # Ждем запуска
+        sleep 20
+        curl -s -o /dev/null -w "%{http_code}" http://localhost:5601
+      register: kibana_result
+      changed_when: false
+
+- name: Настройка Filebeat на веб-серверах
+  hosts: web_servers
+  become: yes
+  tasks:
+    - name: Установка Filebeat через Docker
+      shell: |
+        sudo docker run -d \
+          --name filebeat \
+          --user root \
+          --volume="/var/log/nginx:/var/log/nginx:ro" \
+          --volume="/var/lib/docker/containers:/var/lib/docker/containers:ro" \
+          --volume="/var/run/docker.sock:/var/run/docker.sock:ro" \
+          docker.elastic.co/beats/filebeat:7.17.17 \
+          filebeat -e -strict.perms=false \
+          -E output.elasticsearch.hosts=["10.130.0.26:9200"]
+      when: docker_result is defined and "'You Know, for Search' in docker_result.stdout"
